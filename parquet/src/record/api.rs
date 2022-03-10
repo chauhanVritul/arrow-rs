@@ -123,8 +123,8 @@ pub trait RowAccessor {
     fn get_ulong(&self, i: usize) -> Result<u64>;
     fn get_float(&self, i: usize) -> Result<f32>;
     fn get_double(&self, i: usize) -> Result<f64>;
-    fn get_timestamp_millis(&self, i: usize) -> Result<u64>;
-    fn get_timestamp_micros(&self, i: usize) -> Result<u64>;
+    fn get_timestamp_millis(&self, i: usize) -> Result<i64>;
+    fn get_timestamp_micros(&self, i: usize) -> Result<i64>;
     fn get_decimal(&self, i: usize) -> Result<&Decimal>;
     fn get_string(&self, i: usize) -> Result<&String>;
     fn get_bytes(&self, i: usize) -> Result<&ByteArray>;
@@ -202,9 +202,9 @@ impl RowAccessor for Row {
 
     row_primitive_accessor!(get_double, Double, f64);
 
-    row_primitive_accessor!(get_timestamp_millis, TimestampMillis, u64);
+    row_primitive_accessor!(get_timestamp_millis, TimestampMillis, i64);
 
-    row_primitive_accessor!(get_timestamp_micros, TimestampMicros, u64);
+    row_primitive_accessor!(get_timestamp_micros, TimestampMicros, i64);
 
     row_complex_accessor!(get_decimal, Decimal, Decimal);
 
@@ -278,8 +278,8 @@ pub trait ListAccessor {
     fn get_ulong(&self, i: usize) -> Result<u64>;
     fn get_float(&self, i: usize) -> Result<f32>;
     fn get_double(&self, i: usize) -> Result<f64>;
-    fn get_timestamp_millis(&self, i: usize) -> Result<u64>;
-    fn get_timestamp_micros(&self, i: usize) -> Result<u64>;
+    fn get_timestamp_millis(&self, i: usize) -> Result<i64>;
+    fn get_timestamp_micros(&self, i: usize) -> Result<i64>;
     fn get_decimal(&self, i: usize) -> Result<&Decimal>;
     fn get_string(&self, i: usize) -> Result<&String>;
     fn get_bytes(&self, i: usize) -> Result<&ByteArray>;
@@ -345,9 +345,9 @@ impl ListAccessor for List {
 
     list_primitive_accessor!(get_double, Double, f64);
 
-    list_primitive_accessor!(get_timestamp_millis, TimestampMillis, u64);
+    list_primitive_accessor!(get_timestamp_millis, TimestampMillis, i64);
 
-    list_primitive_accessor!(get_timestamp_micros, TimestampMicros, u64);
+    list_primitive_accessor!(get_timestamp_micros, TimestampMicros, i64);
 
     list_complex_accessor!(get_decimal, Decimal, Decimal);
 
@@ -436,9 +436,9 @@ impl<'a> ListAccessor for MapList<'a> {
 
     map_list_primitive_accessor!(get_double, Double, f64);
 
-    map_list_primitive_accessor!(get_timestamp_millis, TimestampMillis, u64);
+    map_list_primitive_accessor!(get_timestamp_millis, TimestampMillis, i64);
 
-    map_list_primitive_accessor!(get_timestamp_micros, TimestampMicros, u64);
+    map_list_primitive_accessor!(get_timestamp_micros, TimestampMicros, i64);
 
     list_complex_accessor!(get_decimal, Decimal, Decimal);
 
@@ -505,11 +505,11 @@ pub enum Field {
     Bytes(ByteArray),
     /// Date without a time of day, stores the number of days from the
     /// Unix epoch, 1 January 1970.
-    Date(u32),
+    Date(i32),
     /// Milliseconds from the Unix epoch, 1 January 1970.
-    TimestampMillis(u64),
+    TimestampMillis(i64),
     /// Microseconds from the Unix epoch, 1 Janiary 1970.
-    TimestampMicros(u64),
+    TimestampMicros(i64),
 
     // ----------------------------------------------------------------------
     // Complex types
@@ -573,7 +573,7 @@ impl Field {
             ConvertedType::UINT_8 => Field::UByte(value as u8),
             ConvertedType::UINT_16 => Field::UShort(value as u16),
             ConvertedType::UINT_32 => Field::UInt(value as u32),
-            ConvertedType::DATE => Field::Date(value as u32),
+            ConvertedType::DATE => Field::Date(value as i32),
             ConvertedType::DECIMAL => Field::Decimal(Decimal::from_i32(
                 value,
                 descr.type_precision(),
@@ -589,8 +589,8 @@ impl Field {
         match descr.converted_type() {
             ConvertedType::INT_64 | ConvertedType::NONE => Field::Long(value),
             ConvertedType::UINT_64 => Field::ULong(value as u64),
-            ConvertedType::TIMESTAMP_MILLIS => Field::TimestampMillis(value as u64),
-            ConvertedType::TIMESTAMP_MICROS => Field::TimestampMicros(value as u64),
+            ConvertedType::TIMESTAMP_MILLIS => Field::TimestampMillis(value as i64),
+            ConvertedType::TIMESTAMP_MICROS => Field::TimestampMicros(value as i64),
             ConvertedType::DECIMAL => Field::Decimal(Decimal::from_i64(
                 value,
                 descr.type_precision(),
@@ -604,7 +604,7 @@ impl Field {
     /// `Timestamp` value.
     #[inline]
     pub fn convert_int96(_descr: &ColumnDescPtr, value: Int96) -> Self {
-        Field::TimestampMillis(value.to_i64() as u64)
+        Field::TimestampMillis(value.to_i64() as i64)
     }
 
     /// Converts Parquet FLOAT type with logical type into `f32` value.
@@ -776,17 +776,17 @@ impl fmt::Display for Field {
 /// Input `value` is a number of days since the epoch in UTC.
 /// Date is displayed in local timezone.
 #[inline]
-fn convert_date_to_string(value: u32) -> String {
+fn convert_date_to_string(value: i32) -> String {
     static NUM_SECONDS_IN_DAY: i64 = 60 * 60 * 24;
     let dt = Utc.timestamp(value as i64 * NUM_SECONDS_IN_DAY, 0).date();
-    format!("{}", dt.format("%Y-%m-%d %:z"))
+    format!("{}", dt.format("%Y-%m-%d"))
 }
 
 /// Helper method to convert Parquet timestamp into a string.
 /// Input `value` is a number of milliseconds since the epoch in UTC.
 /// Datetime is displayed in local timezone.
 #[inline]
-fn convert_timestamp_millis_to_string(value: u64) -> String {
+fn convert_timestamp_millis_to_string(value: i64) -> String {
     let dt = Utc.timestamp((value / 1000) as i64, 0);
     format!("{}", dt.format("%Y-%m-%d %H:%M:%S %:z"))
 }
@@ -795,7 +795,7 @@ fn convert_timestamp_millis_to_string(value: u64) -> String {
 /// Input `value` is a number of microseconds since the epoch in UTC.
 /// Datetime is displayed in local timezone.
 #[inline]
-fn convert_timestamp_micros_to_string(value: u64) -> String {
+fn convert_timestamp_micros_to_string(value: i64) -> String {
     convert_timestamp_millis_to_string(value / 1000)
 }
 
@@ -1052,7 +1052,7 @@ mod tests {
         fn check_date_conversion(y: u32, m: u32, d: u32) {
             let datetime = chrono::NaiveDate::from_ymd(y as i32, m, d).and_hms(0, 0, 0);
             let dt = Utc.from_utc_datetime(&datetime);
-            let res = convert_date_to_string((dt.timestamp() / 60 / 60 / 24) as u32);
+            let res = convert_date_to_string((dt.timestamp() / 60 / 60 / 24) as i32);
             let exp = format!("{}", dt.format("%Y-%m-%d %:z"));
             assert_eq!(res, exp);
         }
@@ -1069,7 +1069,7 @@ mod tests {
         fn check_datetime_conversion(y: u32, m: u32, d: u32, h: u32, mi: u32, s: u32) {
             let datetime = chrono::NaiveDate::from_ymd(y as i32, m, d).and_hms(h, mi, s);
             let dt = Utc.from_utc_datetime(&datetime);
-            let res = convert_timestamp_millis_to_string(dt.timestamp_millis() as u64);
+            let res = convert_timestamp_millis_to_string(dt.timestamp_millis() as i64);
             let exp = format!("{}", dt.format("%Y-%m-%d %H:%M:%S %:z"));
             assert_eq!(res, exp);
         }
@@ -1376,8 +1376,8 @@ mod tests {
         assert_eq!(4, row.get_ushort(7).unwrap());
         assert_eq!(5, row.get_uint(8).unwrap());
         assert_eq!(6, row.get_ulong(9).unwrap());
-        assert!(7.1 - row.get_float(10).unwrap() < f32::EPSILON);
-        assert!(8.1 - row.get_double(11).unwrap() < f64::EPSILON);
+        assert!((7.1 - row.get_float(10).unwrap()).abs() < f32::EPSILON);
+        assert!((8.1 - row.get_double(11).unwrap()).abs() < f64::EPSILON);
         assert_eq!("abc", row.get_string(12).unwrap());
         assert_eq!(5, row.get_bytes(13).unwrap().len());
         assert_eq!(7, row.get_decimal(14).unwrap().precision());
@@ -1524,10 +1524,10 @@ mod tests {
             Field::Float(9.2),
             Field::Float(10.3),
         ]);
-        assert!(10.3 - list.get_float(2).unwrap() < f32::EPSILON);
+        assert!((10.3 - list.get_float(2).unwrap()).abs() < f32::EPSILON);
 
         let list = make_list(vec![Field::Double(3.1415)]);
-        assert!(3.1415 - list.get_double(0).unwrap() < f64::EPSILON);
+        assert!((3.1415 - list.get_double(0).unwrap()).abs() < f64::EPSILON);
 
         let list = make_list(vec![Field::Str("abc".to_string())]);
         assert_eq!(&"abc".to_string(), list.get_string(0).unwrap());
